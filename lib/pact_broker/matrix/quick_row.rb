@@ -74,14 +74,15 @@ module PactBroker
           query = if selectors.size == 1
             pacticipant_ids_matching_one_selector_optimised(selectors)
           else
+            query = select_pacticipant_ids.distinct
             if infer_integrations
-              select_pacticipant_ids
-                .distinct
-                .matching_any_of_multiple_selectors(selectors)
+              query.matching_any_of_multiple_selectors(selectors)
             else
-              select_pacticipant_ids
-                .distinct
-                .matching_multiple_selectors(selectors)
+              if selectors.all?(&:only_pacticipant_name_specified?)
+                query.matching_multiple_selectors_without_joining_verifications(selectors)
+              else
+                query.matching_multiple_selectors(selectors)
+              end
             end
           end
 
@@ -190,6 +191,17 @@ module PactBroker
                 QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
               )
             }
+        end
+
+        def matching_multiple_selectors_without_joining_verifications(selectors)
+          query_ids = QueryIds.from_selectors(selectors)
+          where {
+            Sequel.&(
+              QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
+              QueryBuilder.provider_or_provider_version_matches(query_ids, :p),
+              QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
+            )
+          }
         end
 
         def unverified_pacts(selectors)
