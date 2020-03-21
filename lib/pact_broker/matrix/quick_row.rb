@@ -81,7 +81,7 @@ module PactBroker
               if selectors.all?(&:only_pacticipant_name_specified?)
                 query.matching_multiple_selectors_without_joining_verifications(selectors)
               else
-                query.matching_multiple_selectors(selectors)
+                query.matching_multiple_selectors_joining_verifications(selectors)
               end
             end
           end
@@ -101,12 +101,16 @@ module PactBroker
           if selectors.size == 1
             matching_one_selector(selectors)
           else
-            matching_multiple_selectors(selectors)
+            matching_multiple_selectors_joining_verifications(selectors)
           end
         end
 
         def order_by_last_action_date
           from_self(alias: :unordered_rows).select(LAST_ACTION_DATE, Sequel[:unordered_rows].* ).order(Sequel.desc(:last_action_date), Sequel.desc(:pact_order))
+        end
+
+        def order_by_pact_publication_created_at
+          order(Sequel.desc(:consumer_version_created_at), Sequel.desc(:pact_order))
         end
 
         def eager_all_the_things
@@ -155,7 +159,7 @@ module PactBroker
             .distinct
             .inner_join_verifications
             .where {
-              QueryBuilder.provider_or_provider_version_matches(query_ids, :v)
+              QueryBuilder.provider_or_provider_version_matches(query_ids, :v, :v)
             }
         end
 
@@ -166,11 +170,19 @@ module PactBroker
             .where {
               Sequel.&(
                 QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
-                QueryBuilder.provider_or_provider_version_matches(query_ids, :v),
+                QueryBuilder.provider_or_provider_version_matches(query_ids, :v, :p),
                 QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
               )
             }
-          end
+        end
+
+        # def matching_multiple_selectors(selectors, join_verifications)
+        #   if selectors.all?(&:only_pacticipant_name_specified?)
+        #     query.matching_multiple_selectors_without_joining_verifications(selectors)
+        #   else
+        #     query.matching_multiple_selectors_joining_verifications(selectors)
+        #   end
+        # end
 
         # When the user has specified multiple selectors, we only want to join the verifications for
         # the specified selectors. This is because of the behaviour of the left outer join.
@@ -181,24 +193,28 @@ module PactBroker
         # Instead, we need to filter the verifications dataset down to only the ones specified in the selectors first,
         # and THEN join them to the pacts, so that we get a row for the pact with null provider version
         # and verification fields.
-        def matching_multiple_selectors(selectors)
+
+        def matching_multiple_selectors_joining_verifications(selectors)
           query_ids = QueryIds.from_selectors(selectors)
           join_verifications_for(query_ids)
             .where {
               Sequel.&(
                 QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
-                QueryBuilder.provider_or_provider_version_matches_or_pact_unverified(query_ids, :v),
+                QueryBuilder.provider_or_provider_version_matches_or_pact_unverified(query_ids, :v, :p),
                 QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
               )
             }
         end
 
         def matching_multiple_selectors_without_joining_verifications(selectors)
+          # There are no versions specified in these selectors, so we can do the whole
+          # query based on the consumer/provider IDs, which we have in the pact_publication
+          # table without having to do a join.
           query_ids = QueryIds.from_selectors(selectors)
           where {
             Sequel.&(
               QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
-              QueryBuilder.provider_or_provider_version_matches(query_ids, :p),
+              QueryBuilder.provider_matches(query_ids, :p),
               QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
             )
           }
@@ -224,7 +240,7 @@ module PactBroker
               Sequel.&(
                 Sequel.|(
                   QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
-                  QueryBuilder.provider_or_provider_version_matches_or_pact_unverified(query_ids, :v),
+                  QueryBuilder.provider_or_provider_version_matches_or_pact_unverified(query_ids, :v, :p),
                 ),
                 QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
               )
