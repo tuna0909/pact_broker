@@ -163,27 +163,6 @@ module PactBroker
             }
         end
 
-        def verified_pacts_matching_multiple_selectors(selectors)
-          query_ids = QueryIds.from_selectors(selectors)
-
-          join(verifications_for(query_ids), LP_LV_JOIN, { table_alias: :v } )
-            .where {
-              Sequel.&(
-                QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
-                QueryBuilder.provider_or_provider_version_matches(query_ids, :v, :p),
-                QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
-              )
-            }
-        end
-
-        # def matching_multiple_selectors(selectors, join_verifications)
-        #   if selectors.all?(&:only_pacticipant_name_specified?)
-        #     query.matching_multiple_selectors_without_joining_verifications(selectors)
-        #   else
-        #     query.matching_multiple_selectors_joining_verifications(selectors)
-        #   end
-        # end
-
         # When the user has specified multiple selectors, we only want to join the verifications for
         # the specified selectors. This is because of the behaviour of the left outer join.
         # Imagine a pact has been verified by a provider version that was NOT specified in the selectors.
@@ -218,19 +197,6 @@ module PactBroker
               QueryBuilder.either_consumer_or_provider_was_specified_in_query(query_ids, :p)
             )
           }
-        end
-
-        def unverified_pacts(selectors)
-          query_ids = QueryIds.from_selectors(selectors)
-          lp_lv_join = { Sequel[:p][:pact_version_id] => Sequel[:v][:pact_version_id] }
-
-          join(verifications_for(query_ids), lp_lv_join, { table_alias: :v } )
-              .where(Sequel[:v][:pact_version_id] => nil)
-              .where {
-                Sequel.&(
-                  QueryBuilder.consumer_or_consumer_version_matches(query_ids, :p),
-                )
-              }
         end
 
         def matching_any_of_multiple_selectors(selectors)
@@ -284,10 +250,6 @@ module PactBroker
 
         def join_provider_versions
           left_outer_join(:versions, PROVIDER_VERSION_JOIN, { table_alias: :pv } )
-        end
-
-        def inner_join_provider_versions
-          join(:versions, PROVIDER_VERSION_JOIN, { table_alias: :pv } )
         end
 
         def join_verifications
@@ -383,32 +345,26 @@ module PactBroker
 
       def consumer_name
         consumer.name
-        # return_or_raise_if_not_set(:consumer_name)
       end
 
       def consumer_version_number
         consumer_version.number
-        # return_or_raise_if_not_set(:consumer_version_number)
       end
 
       def consumer_version_order
         consumer_version.order
-        # return_or_raise_if_not_set(:consumer_version_order)
       end
 
       def provider_name
         provider.name
-        # return_or_raise_if_not_set(:provider_name)
       end
 
       def provider_version_number
         provider_version&.number
-        # return_or_raise_if_not_set(:provider_version_number)
       end
 
       def provider_version_order
         provider_version&.order
-        # return_or_raise_if_not_set(:provider_version_order)
       end
 
       def last_action_date
