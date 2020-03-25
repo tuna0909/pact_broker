@@ -125,15 +125,8 @@ module PactBroker
 
       def query_matrix selectors, options
         query = base_model(options).select_all_columns
-        query = query.order_by_pact_publication_created_at.limit(options[:limit]) if options[:limit]
-        query = query.matching_selectors(selectors)
-
-        # if options[:days]
-        #   min_created_at = Date.today - options[:days]
-        #   query = query.where(Sequel.lit('p.created_at > ?', min_created_at))
-        # end
-
-        query = query.order_by_last_action_date
+                  .matching_selectors(selectors)
+                  .order_by_last_action_date
 
         query = query.limit(options[:limit]) if options[:limit]
         query.eager_all_the_things.all

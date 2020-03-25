@@ -80,7 +80,7 @@ module PactBroker
           pact_publication_id: pact_publication.id,
           consumer_id: pact_publication.consumer_id,
           pact_version_id: pact_publication.pact_version_id,
-          created_at: pact_publication.created_at
+          created_at: pact_publication.consumer_version.created_at
         }
 
         LatestPactPublicationIdForConsumerVersion.new(params).upsert
