@@ -62,6 +62,10 @@ module PactBroker
         version.refresh # reload with the populated order
       end
 
+      def create_or_update(version, pacticipant_name)
+
+      end
+
       def find_by_pacticipant_id_and_number_or_create pacticipant_id, number
         if version = find_by_pacticipant_id_and_number(pacticipant_id, number)
           version

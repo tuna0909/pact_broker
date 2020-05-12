@@ -5,23 +5,32 @@ require 'pact_broker/api/resources/base_resource'
 module PactBroker
   module Api
     module Resources
-
       class Version < BaseResource
 
         def content_types_provided
           [["application/hal+json", :to_json]]
         end
 
+        def content_types_accepted
+          [["application/json", :from_json]]
+        end
+
         def allowed_methods
-          ["GET", "DELETE", "OPTIONS"]
+          ["GET", "PATCH", "DELETE", "OPTIONS"]
         end
 
         def resource_exists?
           version
         end
 
+        def from_json
+          parsed_version = Decorators::VersionDecorator.new(@version || PactBroker::Domain::Version.new).from_json(request_body)
+          version_service.create_or_update(parsed_version, identifier_from_path[:pacticipant_name])
+          to_json
+        end
+
         def to_json
-          Decorators::VersionDecorator.new(version).to_json(user_options: {base_url: base_url})
+          Decorators::VersionDecorator.new(version).to_json(user_options: decorator_context)
         end
 
         def delete_resource
